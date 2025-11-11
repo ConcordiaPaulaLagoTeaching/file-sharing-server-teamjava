@@ -1,7 +1,9 @@
 package ca.concordia.server;
 import ca.concordia.filesystem.FileSystemManager;
 
+
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
@@ -11,10 +13,9 @@ public class FileServer {
 
     private FileSystemManager fsManager;
     private int port;
-    public FileServer(int port, String fileSystemName, int totalSize){
+    public FileServer(int port, String fileSystemName, int totalSize) throws IOException{ // add IOException
         // Initialize the FileSystemManager
-        FileSystemManager fsManager = new FileSystemManager(fileSystemName,
-                10*128 );
+        FileSystemManager fsManager = new FileSystemManager(fileSystemName, totalSize );
         this.fsManager = fsManager;
         this.port = port;
     }
@@ -43,17 +44,15 @@ public class FileServer {
                                 writer.flush();
                                 break;
                             //TODO: Implement other commands READ, WRITE, DELETE, LIST
-                            case "LIST":
-                                //to do: implement list
+                            case "LIST": // List commmand wasnt implemented yet
+                                String[] files = fsManager.listFiles();
+                                writer.println("FILES: " + String.join(", ", files));
+                                writer.flush();
                                 break;
-                            case "DELETE":
-                                //to do: implement delete
-                                break;
-                            case "READ":
-                                //to do: implement read
-                                break;
-                            case "WRITE":
-                                //to do: implement write
+                            case "DELETE": // delete command wasnt implemented yet
+                                fsManager.deleteFile(parts[1]);
+                                writer.println("SUCCESS: File '" + parts[1] + "' deleted.");
+                                writer.flush();
                                 break;
                             case "QUIT":
                                 writer.println("SUCCESS: Disconnecting.");
