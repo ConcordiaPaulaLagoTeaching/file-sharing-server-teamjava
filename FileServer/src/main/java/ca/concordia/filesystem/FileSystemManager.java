@@ -6,6 +6,7 @@ import ca.concordia.filesystem.datastructures.FNode; // needed for creating and 
 
 import java.io.File; // needed for checking if a file exists
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
 import java.util.concurrent.locks.ReentrantReadWriteLock; // needed for different read/write locks, better concurrency
 
 public class FileSystemManager {
@@ -81,11 +82,148 @@ public class FileSystemManager {
         throw new UnsupportedOperationException("Method not implemented yet.");
     }
 
+    // writeFile replaces the entire contents of an existing file.
+    // This operation must be atomic: if anything fails, the file must remain unchanged.
 
-    // TODO: Add readFile, writeFile and other required methods,
+    // helper: finds a file entry in the inode table by filename
+    private FEntry findFile(String filename) {
+        for (int i = 0; i < MAXFILES; i++) {
+            if (inodeTable[i] != null && inodeTable[i].isInUse() 
+                && inodeTable[i].getFilename().equals(filename)) {
+                return inodeTable[i];
+            }
+        }
+        return null;
+    }
+    // helper: returns a list of all block indices belonging to this file, by following FNode.next
+    private java.util.List<Integer> getBlocksForFile(FEntry entry) {
+        java.util.List<Integer> blocks = new java.util.ArrayList<>();
 
-    //deleteFile(String fileName) removes file and zeroes out its blocks
-    //writeFile(String filename, byte[] data) replaces contents of a file; must be atomic (no partial writes!)
-    //readFile(String filename) returns data stored inside a file
-    //listFiles() returns names of all existing files
+        int block = entry.getFirstBlock();
+        while (block != -1) {
+            blocks.add(block);
+            block = fnodeTable[block].getNext();
+        }
+        return blocks;
+    }
+    // helper: allocate a certain number of free blocks and mark them as used
+    private java.util.List<Integer> allocateBlocks(int blocksNeeded) throws Exception {
+        java.util.List<Integer> allocated = new java.util.ArrayList<>();
+
+        for (int i = firstDataBlock; i < MAXBLOCKS && allocated.size() < blocksNeeded; i++) {
+            if (!freeBlockList[i]) {          // false = free
+                freeBlockList[i] = true;      // mark allocated
+                allocated.add(i);
+            }
+        }
+
+        // if not enough blocks → undo allocation + fail
+        if (allocated.size() < blocksNeeded) {
+            for (int blockIndex : allocated) {
+                freeBlockList[blockIndex] = false;
+            }
+            throw new Exception("ERROR: Not enough free blocks available.");
+        }
+
+        return allocated;
+    }
+
+
+    public void writeFile(String fileName, byte[] contents) throws Exception {
+
+        // request exclusive write lock (no readers or writers allowed during this update)
+        rwLock.writeLock().lock(); 
+
+        try {
+            // find the file in inode table
+            FEntry fileEntry = findFile(fileName);
+            if (fileEntry == null || !fileEntry.isInUse()) {
+                throw new Exception("ERROR: File " + fileName + " does not exist.");
+            }
+
+            // determine how many blocks are required for the new contents
+            int newSize = contents.length;
+            int blocksNeeded = (newSize + BLOCK_SIZE - 1) / BLOCK_SIZE; // round up
+
+            // save old state for rollback (important for atomicity)
+            short originalFirstBlock = fileEntry.getFirstBlock();
+            short originalFileSize = fileEntry.getFilesize();
+            var originalBlockList = getBlocksForFile(fileEntry); // chain of blocks currently used
+
+            // this list will store *newly allocated* blocks
+            var newBlockList = new java.util.ArrayList<Integer>();
+
+            try {
+                // free old blocks temporarily (mark as free, break links)
+                // we do not permanently lose them yet because rollback below can restore them.
+                for (int blockIndex : originalBlockList) {
+                    freeBlockList[blockIndex] = false;     // false means "free"
+                    fnodeTable[blockIndex].setNext(-1);    // unlink
+                }
+
+                // if the new content is empty, the file becomes empty → update metadata and stop
+                if (blocksNeeded == 0) {
+                    fileEntry.setFirstBlock((short) -1);
+                    fileEntry.setFilesize((short) 0);
+                    return;
+                }
+
+                // allocate new blocks
+                newBlockList = (ArrayList<Integer>) allocateBlocks(blocksNeeded);
+
+                // write new data into the allocated blocks
+                for (int i = 0; i < newBlockList.size(); i++) {
+                    int blockIndex = newBlockList.get(i);
+
+                    // compute how much data goes in this block
+                    int startOffset = i * BLOCK_SIZE;
+                    int length = Math.min(BLOCK_SIZE, newSize - startOffset);
+
+                    // prepare block buffer
+                    byte[] blockData = new byte[BLOCK_SIZE];
+                    System.arraycopy(contents, startOffset, blockData, 0, length);
+
+                    // write to disk at correct block position
+                    disk.seek((long) blockIndex * BLOCK_SIZE);
+                    disk.write(blockData);
+                }
+
+                // link allocated blocks together using FNode.next (forming a linked list)
+                for (int i = 0; i < newBlockList.size() - 1; i++) {
+                    fnodeTable[newBlockList.get(i)].setNext(newBlockList.get(i + 1));
+                }
+                fnodeTable[newBlockList.get(newBlockList.size() - 1)].setNext(-1); // last block points to none
+
+                // commit update to inode (this is the "no turning back" moment)
+                fileEntry.setFirstBlock(newBlockList.get(0).shortValue());
+                fileEntry.setFilesize((short) newSize);
+
+            } catch (Exception e) {
+                // undo everything if any step failed
+
+                // unallocate any new blocks
+                for (int blockIndex : newBlockList) {
+                    freeBlockList[blockIndex] = false;
+                    fnodeTable[blockIndex].setNext(-1);
+                }
+
+                // restore old blocks
+                for (int blockIndex : originalBlockList) {
+                    freeBlockList[blockIndex] = true;
+                }
+
+                // restore inode metadata
+                fileEntry.setFirstBlock(originalFirstBlock);
+                fileEntry.setFilesize(originalFileSize);
+
+                throw e; // rethrow after rollback
+            }
+
+        } finally {
+            // release lock no matter what
+            rwLock.writeLock().unlock();
+        }
+    }
+
+
 }
