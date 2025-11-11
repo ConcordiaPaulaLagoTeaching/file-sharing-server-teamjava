@@ -27,7 +27,7 @@ public class FileServer {
             System.out.println("Server started. Listening on port " + port + "...");
     
             while (true) {
-                Socket clientSocket = serverSocket.accept();
+                Socket clientSocket = serverSocket.accept(); // accept a new client connection
                 System.out.println("Client connected: " + clientSocket);
     
                 // we just create a thread for each client here
