@@ -3,11 +3,12 @@ import java.io.*;
 import java.net.Socket;
 import ca.concordia.filesystem.FileSystemManager;
 
-public class ClientHandler implements Runnable {
+public class ClientHandler implements Runnable { // runnable for threading
 
     private final Socket clientSocket;
     private final FileSystemManager fsManager;
 
+    // constructor
     public ClientHandler(Socket clientSocket, FileSystemManager fsManager) {
         this.clientSocket = clientSocket;
         this.fsManager = fsManager;
