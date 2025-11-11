@@ -39,34 +39,78 @@ public class FileServer {
 
                         switch (command) {
                             case "CREATE":
-                                fsManager.createFile(parts[1]);
-                                writer.println("SUCCESS: File '" + parts[1] + "' created.");
+                                try {
+                                    fsManager.createFile(parts[1]);
+                                    writer.println("SUCCESS: File created.");
+                                } catch (Exception e) {
+                                    writer.println("ERROR: " + e.getMessage());
+                                }
                                 writer.flush();
-                                break;
+                                break; 
+
                             case "WRITE":
-                                String dataToWrite = line.substring(line.indexOf(parts[2]));
-                                fsManager.writeFile(parts[1], dataToWrite.getBytes());
-                                writer.println("SUCCESS: Written to file '" + parts[1] + "'.");
+                                if (parts.length < 3) { // handle incorrect, command format: WRITE + filename + data
+                                    writer.println("ERROR: Command must look like: WRITE <filename> <data>");
+                                    writer.flush();
+                                    break;
+                                }
+                            
+                                String writeFileName = parts[1];
+                            
+                                // reconstruct content including spaces
+                                StringBuilder sbWrite = new StringBuilder();
+                                for (int i = 2; i < parts.length; i++) {
+                                    sbWrite.append(parts[i]);
+                                    if (i < parts.length - 1) sbWrite.append(" "); 
+                                }
+                                byte[] writeData = sbWrite.toString().getBytes();
+                            
+                                try {
+                                    fsManager.writeFile(writeFileName, writeData);
+                                    writer.println("SUCCESS: File written.");
+                                } catch (Exception e) {
+                                    writer.println("ERROR: " + e.getMessage());
+                                }
                                 writer.flush();
                                 break;
-                            case "READ":
-                                byte[] data = fsManager.readFile(parts[1]);
-                                writer.println("DATA: " + new String(data));
+
+                            case "READ": // added error handling
+                                try {
+                                    byte[] data = fsManager.readFile(parts[1]);
+                                    writer.println("FILE CONTENTS: " + new String(data));
+                                } catch (Exception e) {
+                                    writer.println("ERROR: " + e.getMessage());
+                                }
+                                writer.flush();
+                                break;  
+                                
+                            case "LIST": 
+                                String[] fileList = fsManager.listFiles();
+                                writer.println("FILES: " + String.join(", ", fileList));
                                 writer.flush();
                                 break;
-                            case "LIST": // List commmand wasnt implemented yet
-                                String[] files = fsManager.listFiles();
-                                writer.println("FILES: " + String.join(", ", files));
+                                
+                            case "DELETE":
+                                try {
+                                    fsManager.deleteFile(parts[1]);
+                                    writer.println("SUCCESS: File deleted.");
+                                } catch (Exception e) {
+                                    writer.println("ERROR: " + e.getMessage());
+                                }
                                 writer.flush();
                                 break;
-                            case "DELETE": // delete command wasnt implemented yet
-                                fsManager.deleteFile(parts[1]);
-                                writer.println("SUCCESS: File '" + parts[1] + "' deleted.");
-                                writer.flush();
-                                break;
+
                             case "QUIT":
-                                writer.println("SUCCESS: Disconnecting.");
-                                return;
+                                try{
+                                    writer.println("Connection closing.");
+                                    writer.flush();
+                                    clientSocket.close();
+                                    System.out.println("Client disconnected.");
+                                    return;
+                                } catch (Exception e) {
+                                    writer.println("ERROR: " + e.getMessage());
+                                }
+
                             default:
                                 writer.println("ERROR: Unknown command.");
                                 break;
