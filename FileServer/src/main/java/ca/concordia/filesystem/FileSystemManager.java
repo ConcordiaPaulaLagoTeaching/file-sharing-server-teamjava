@@ -2,13 +2,9 @@
 package ca.concordia.filesystem;
 
 import ca.concordia.filesystem.datastructures.FEntry;
-import ca.concordia.filesystem.datastructures.FNode; // needed for creating and managing blocks
 
-import java.io.File; // needed for checking if a file exists
 import java.io.RandomAccessFile;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.IOException;
@@ -21,7 +17,6 @@ public class FileSystemManager {
     private final int MAXBLOCKS = 10;
     private static FileSystemManager instance = null;
     private final RandomAccessFile disk;
-    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock(); // for concurent reads and exclusive writes
 
     private static final int BLOCK_SIZE = 128; // Example block size
 
