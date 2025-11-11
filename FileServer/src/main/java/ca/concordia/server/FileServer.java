@@ -43,7 +43,12 @@ public class FileServer {
                                 writer.println("SUCCESS: File '" + parts[1] + "' created.");
                                 writer.flush();
                                 break;
-                            //TODO: Implement other commands READ, WRITE, DELETE, LIST
+                            case "WRITE":
+                                String dataToWrite = line.substring(line.indexOf(parts[2]));
+                                fsManager.writeFile(parts[1], dataToWrite.getBytes());
+                                writer.println("SUCCESS: Written to file '" + parts[1] + "'.");
+                                writer.flush();
+                                break;
                             case "LIST": // List commmand wasnt implemented yet
                                 String[] files = fsManager.listFiles();
                                 writer.println("FILES: " + String.join(", ", files));

@@ -37,7 +37,6 @@ public class FileSystemManager {
         this.disk = new RandomAccessFile(filename, "rw");
         this.inodeTable = new FEntry[MAXFILES];
         this.freeBlockList = new boolean[MAXBLOCKS];
-       
         // initialize file system
         initializeFileSystem(totalSize);
     }
@@ -146,6 +145,67 @@ public class FileSystemManager {
         }
     }
 
+    // method to write file
+    public void writeFile(String fileName, byte[] contents) throws Exception {
+        globalLock.lock();
+        try {
+            // find the file
+            FEntry fileEntry = null;
+            for (FEntry entry : inodeTable) {
+                if (entry.isInUse() && entry.getFilename().equals(fileName)) {
+                    fileEntry = entry; // found it
+                    break;
+                }
+            }
+            if (fileEntry == null) {
+                throw new Exception("ERROR: File " + fileName + " does not exist.");
+            }
+    
+            // make sure file size is within limits
+            if (contents.length > BLOCK_SIZE) {
+                throw new Exception("ERROR: File too large. Max size is " + BLOCK_SIZE + " bytes.");
+            }
+    
+            // free old block if it exists
+            int oldBlock = fileEntry.getFirstBlock();
+            if (oldBlock >= 0) {
+                freeBlockList[oldBlock] = true; // mark old block free
+            }
+    
+            // find a new free block
+            int newBlock = -1;
+            for (int i = 0; i < MAXBLOCKS; i++) {
+                if (freeBlockList[i]) { // true = free
+                    newBlock = i;
+                    freeBlockList[i] = false; // mark allocated
+                    break;
+                }
+            }
+            if (newBlock == -1) {
+                throw new Exception("ERROR: No free blocks available.");
+            }
+    
+            // write contents to the new block
+            byte[] blockData = new byte[BLOCK_SIZE];
+            System.arraycopy(contents, 0, blockData, 0, contents.length);
+    
+            disk.seek((long) newBlock * BLOCK_SIZE);
+            disk.write(blockData);
+    
+            // update FEntry
+            fileEntry.setFirstBlock((short) newBlock);
+            fileEntry.setFilesize((short) contents.length);
+    
+        } finally {
+            globalLock.unlock();
+        }
+    }
+    
+    public byte[] readFile(String fileName) throws Exception {
+        // TODO
+        throw new UnsupportedOperationException("Method not implemented yet.");
+    }
+
     // Overwrite block with zeros
     private void zeroOutBlock(int blockIndex) throws IOException {
         byte[] zeros = new byte[BLOCK_SIZE];
@@ -153,15 +213,5 @@ public class FileSystemManager {
         disk.seek(offset);
         disk.write(zeros);
     }
-    public void writeFile(String fileName) throws Exception {
-        // TODO
-        throw new UnsupportedOperationException("Method not implemented yet.");
-    }
-
-    public byte[] readFile(String fileName) throws Exception {
-        // TODO
-        throw new UnsupportedOperationException("Method not implemented yet.");
-    }
-
 }
 
