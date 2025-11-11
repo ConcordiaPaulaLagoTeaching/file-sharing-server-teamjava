@@ -202,9 +202,41 @@ public class FileSystemManager {
     }
     
     public byte[] readFile(String fileName) throws Exception {
-        // TODO
-        throw new UnsupportedOperationException("Method not implemented yet.");
+        globalLock.lock(); // aquire lock
+        try {
+            // find file in inode table
+            FEntry fileEntry = null;
+            for (FEntry entry : inodeTable) {
+                if (entry.isInUse() && entry.getFilename().equals(fileName)) {
+                    fileEntry = entry;
+                    break;
+                }
+            }
+            if (fileEntry == null) {
+                throw new Exception("ERROR: File " + fileName + " does not exist.");
+            }
+    
+            // check if file has data
+            int blockIndex = fileEntry.getFirstBlock();
+            if (blockIndex < 0 || blockIndex >= MAXBLOCKS || freeBlockList[blockIndex]) {
+                throw new Exception("ERROR: File " + fileName + " has no data stored.");
+            }
+    
+            // determine how many bytes to read
+            int size = fileEntry.getFilesize();
+            byte[] data = new byte[size];
+    
+            // read data from disk
+            disk.seek((long) blockIndex * BLOCK_SIZE);
+            disk.read(data, 0, size);
+    
+            return data;
+    
+        } finally {
+            globalLock.unlock();
+        }
     }
+    
 
     // Overwrite block with zeros
     private void zeroOutBlock(int blockIndex) throws IOException {

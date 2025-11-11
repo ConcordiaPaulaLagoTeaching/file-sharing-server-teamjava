@@ -49,6 +49,11 @@ public class FileServer {
                                 writer.println("SUCCESS: Written to file '" + parts[1] + "'.");
                                 writer.flush();
                                 break;
+                            case "READ":
+                                byte[] data = fsManager.readFile(parts[1]);
+                                writer.println("DATA: " + new String(data));
+                                writer.flush();
+                                break;
                             case "LIST": // List commmand wasnt implemented yet
                                 String[] files = fsManager.listFiles();
                                 writer.println("FILES: " + String.join(", ", files));
