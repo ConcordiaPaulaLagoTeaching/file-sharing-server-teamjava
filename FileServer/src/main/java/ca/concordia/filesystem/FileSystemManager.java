@@ -4,14 +4,14 @@ package ca.concordia.filesystem;
 import ca.concordia.filesystem.datastructures.FEntry;
 
 import java.io.RandomAccessFile;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.IOException;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class FileSystemManager {
 
-    private final ReentrantLock globalLock = new ReentrantLock();
+    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
     private final int MAXFILES = 5;
     private final int MAXBLOCKS = 10;
@@ -56,8 +56,9 @@ public class FileSystemManager {
 
     // create a singleton empty file system
     public void createFile(String fileName) throws Exception {
-        globalLock.lock();
+        rwLock.writeLock().lock();
         try {
+            // check filename length
             if (fileName.length() > 11) {
                 throw new IllegalArgumentException("Filename cannot be longer than 11 characters.");
             }
@@ -85,13 +86,13 @@ public class FileSystemManager {
                 freeEntry.setInUse(true);
             }
             } finally {
-                globalLock.unlock();
+                rwLock.writeLock().unlock();
             }
         }
 
         // Deletes existing file by overwriting data with zeros
     public void deleteFile(String fileName) throws Exception {
-        globalLock.lock();
+        rwLock.writeLock().lock();
         try {
             FEntry targetEntry = null;
             for (FEntry entry : inodeTable) {
@@ -120,13 +121,13 @@ public class FileSystemManager {
             targetEntry.clear();
 
         } finally {
-            globalLock.unlock();
+            rwLock.writeLock().unlock();
         }
     }
 
     // List all files in use
     public String[] listFiles() {
-        globalLock.lock();
+        rwLock.readLock().lock();
         try {
             List<String> fileList = new ArrayList<>();
             for (FEntry entry : inodeTable) {
@@ -136,13 +137,13 @@ public class FileSystemManager {
             }
             return fileList.toArray(new String[0]);
         } finally {
-            globalLock.unlock();
+            rwLock.readLock().unlock();
         }
     }
 
     // method to write file
     public void writeFile(String fileName, byte[] contents) throws Exception {
-        globalLock.lock();
+        rwLock.writeLock().lock();
         try {
             // find the file
             FEntry fileEntry = null;
@@ -192,12 +193,12 @@ public class FileSystemManager {
             fileEntry.setFilesize((short) contents.length);
     
         } finally {
-            globalLock.unlock();
+            rwLock.writeLock().unlock();
         }
     }
     
     public byte[] readFile(String fileName) throws Exception {
-        globalLock.lock(); // aquire lock
+        rwLock.readLock().lock(); // aquire lock
         try {
             // find file in inode table
             FEntry fileEntry = null;
@@ -228,7 +229,7 @@ public class FileSystemManager {
             return data;
     
         } finally {
-            globalLock.unlock();
+            rwLock.readLock().unlock();
         }
     }
     
