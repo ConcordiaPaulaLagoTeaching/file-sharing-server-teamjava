@@ -1,4 +1,3 @@
-
 package ca.concordia.filesystem;
 
 import ca.concordia.filesystem.datastructures.FEntry;
@@ -15,6 +14,7 @@ public class FileSystemManager {
 
     private final int MAXFILES = 5;
     private final int MAXBLOCKS = 10;
+    private static final int METADATA_SIZE = 90; // size of metadata area in bytes
     private static FileSystemManager instance = null;
     private final RandomAccessFile disk;
 
@@ -32,8 +32,15 @@ public class FileSystemManager {
         this.disk = new RandomAccessFile(filename, "rw");
         this.inodeTable = new FEntry[MAXFILES];
         this.freeBlockList = new boolean[MAXBLOCKS];
-        // initialize file system
-        initializeFileSystem(totalSize);
+        
+        if (disk.length() == 0) {
+            // if new disk initialize and save
+            initializeFileSystem(totalSize);
+            saveMetadata(); // save initial state
+        } else {
+            // else: existing disk, reload saved metadata
+            loadMetadata();
+        }
     }
 
     // initialize the file system structures 
@@ -88,6 +95,7 @@ public class FileSystemManager {
                 freeEntry.setFilesize((short) 0);
                 freeEntry.setFirstBlock((short) -1); // No blocks assigned yet
                 freeEntry.setInUse(true);
+                saveMetadata(); // persist changes
             }
             } finally {
                 rwLock.writeLock().unlock();
@@ -123,6 +131,7 @@ public class FileSystemManager {
 
             // reset data
             targetEntry.clear();
+            saveMetadata(); // persist changes
 
         } finally {
             rwLock.writeLock().unlock();
@@ -189,12 +198,14 @@ public class FileSystemManager {
             byte[] blockData = new byte[BLOCK_SIZE];
             System.arraycopy(contents, 0, blockData, 0, contents.length);
     
-            disk.seek((long) newBlock * BLOCK_SIZE);
+            disk.seek(METADATA_SIZE + (long) newBlock * BLOCK_SIZE);
             disk.write(blockData);
     
             // update FEntry
             fileEntry.setFirstBlock((short) newBlock);
             fileEntry.setFilesize((short) contents.length);
+
+            saveMetadata();
     
         } finally {
             rwLock.writeLock().unlock();
@@ -227,7 +238,7 @@ public class FileSystemManager {
             byte[] data = new byte[size];
     
             // read data from disk
-            disk.seek((long) blockIndex * BLOCK_SIZE);
+            disk.seek(METADATA_SIZE + (long) blockIndex * BLOCK_SIZE);
             disk.read(data, 0, size);
     
             return data;
@@ -245,5 +256,68 @@ public class FileSystemManager {
         disk.seek(offset);
         disk.write(zeros);
     }
-}
 
+    // SAVING STATE METHODS
+    // helper to read fixed size string from disk file
+    private String readFixedString(int length) throws IOException {
+        byte[] data = new byte[length];
+        disk.read(data);
+        return new String(data);
+    }
+
+    // helper to store text in the disk file in a fixed size format 
+    private void writeFixedString(String s, int length) throws IOException {
+        byte[] data = new byte[length];
+        byte[] nameBytes = s.getBytes();
+        System.arraycopy(nameBytes, 0, data, 0, Math.min(nameBytes.length, length));
+        disk.write(data);
+    }
+
+    void saveMetadata() throws IOException {
+        rwLock.writeLock().lock();
+        try {
+            // save inode table
+            disk.seek(0);
+
+            for (FEntry entry : inodeTable) {
+                writeFixedString(entry.getFilename(), 11);
+                disk.writeShort(entry.getFilesize());
+                disk.writeShort(entry.getFirstBlock());
+                disk.writeBoolean(entry.isInUse());
+            }
+            // save free block list
+            for (boolean isFree : freeBlockList) {
+                disk.writeBoolean(isFree);
+            }
+        } finally {
+            rwLock.writeLock().unlock();
+        }
+    }
+
+    private void loadMetadata() throws IOException {
+        rwLock.writeLock().lock();
+        try {
+            disk.seek(0);
+
+            for (int i = 0; i < MAXFILES; i++) {
+                String name = readFixedString(11).trim();
+                short size = disk.readShort();
+                short firstBlock = disk.readShort();
+                boolean inUse = disk.readBoolean();
+                FEntry e = new FEntry();
+                e.setFilename(name);
+                e.setFilesize(size);
+                e.setFirstBlock(firstBlock);
+                e.setInUse(inUse);
+                inodeTable[i] = e;
+            }
+
+            for (int i = 0; i < MAXBLOCKS; i++) {
+                freeBlockList[i] = disk.readBoolean();
+            }
+
+        } finally {
+            rwLock.writeLock().unlock();
+        }
+    }
+}
