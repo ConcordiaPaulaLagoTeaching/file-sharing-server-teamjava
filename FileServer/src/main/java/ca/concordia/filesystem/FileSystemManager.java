@@ -78,6 +78,10 @@ public class FileSystemManager {
                 }
             }
 
+            if (freeEntry == null) { // add this to handle case if user creates more than 5 files
+                throw new Exception("ERROR: Maximum number of files reached. Delete a file before creating a new one.");
+            }
+
             // initialize the new file 
             if (freeEntry != null) { //Unnecessary null check but just in case
                 freeEntry.setFilename(fileName);
