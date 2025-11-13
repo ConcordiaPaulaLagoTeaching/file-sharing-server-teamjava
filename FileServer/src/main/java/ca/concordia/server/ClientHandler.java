@@ -14,7 +14,7 @@ public class ClientHandler implements Runnable { // runnable for threading
         this.fsManager = fsManager;
     }
 
-    @Override
+    @Override //override run method for threading
     public void run() {
         try (
             BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
@@ -31,12 +31,12 @@ public class ClientHandler implements Runnable { // runnable for threading
                 switch (command) {
                     case "CREATE":
                         try {
-                            fsManager.createFile(parts[1]);
+                            fsManager.createFile(parts[1]); //parts[1] is filename {FILE1, FILE2, etc}
                             writer.println("SUCCESS: File created.");
                         } catch (Exception e) {
                             writer.println("ERROR: " + e.getMessage());
                         }
-                        writer.flush();
+                        writer.flush(); // send data immediately with flush
                         break; 
 
                     case "WRITE":

@@ -1,8 +1,5 @@
 package ca.concordia.server;
 import ca.concordia.filesystem.FileSystemManager;
-
-
-
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -12,7 +9,6 @@ public class FileServer {
     private FileSystemManager fsManager;
     private int port;
     public FileServer(int port, String fileSystemName, int totalSize) throws IOException{ // add IOException
-        // Initialize the FileSystemManager
         FileSystemManager fsManager = new FileSystemManager(fileSystemName, totalSize );
         this.fsManager = fsManager;
         this.port = port;
@@ -33,7 +29,7 @@ public class FileServer {
                 clientThread.start();
             }
     
-        } catch (IOException e) {
+        } catch (IOException e) { // rare case of server socket failure, still handle it
             e.printStackTrace();
             System.err.println("Could not start server on port " + port);
         }

@@ -14,7 +14,7 @@ public class FileSystemManager {
 
     private final int MAXFILES = 5;
     private final int MAXBLOCKS = 10;
-    private static final int METADATA_SIZE = 90; // size of metadata area in bytes
+    private static final int METADATA_SIZE = 90; // 80 bytes for inode table + 10 bytes for free block list
     private static FileSystemManager instance = null;
     private final RandomAccessFile disk;
 
@@ -28,7 +28,7 @@ public class FileSystemManager {
             throw new IllegalStateException("FileSystemManager is already initialized.");
         }
 
-        instance = this;
+        instance = this; // set the singleton instance
         this.disk = new RandomAccessFile(filename, "rw");
         this.inodeTable = new FEntry[MAXFILES];
         this.freeBlockList = new boolean[MAXBLOCKS];
@@ -47,7 +47,7 @@ public class FileSystemManager {
     private void initializeFileSystem(int totalSize) throws IOException {
         // mark all blocks as free
         for (int i = 0; i < MAXBLOCKS; i++) {
-            freeBlockList[i] = true;
+            freeBlockList[i] = true;  // false = used, true = free
         }
 
         // initialize file entries
@@ -211,8 +211,8 @@ public class FileSystemManager {
             byte[] blockData = new byte[BLOCK_SIZE];
             System.arraycopy(contents, 0, blockData, 0, contents.length);
     
-            disk.seek(METADATA_SIZE + (long) newBlock * BLOCK_SIZE);
-            disk.write(blockData);
+            disk.seek(METADATA_SIZE + (long) newBlock * BLOCK_SIZE); // seek to block position
+            disk.write(blockData); //now that we have seeked, write the data
     
             // update FEntry
             fileEntry.setFirstBlock((short) newBlock);
@@ -316,7 +316,7 @@ public class FileSystemManager {
     private void loadMetadata() throws IOException {
         rwLock.writeLock().lock();
         try {
-            disk.seek(0);
+            disk.seek(0); // seek to start
 
             for (int i = 0; i < MAXFILES; i++) {
                 String name = readFixedString(11).trim();

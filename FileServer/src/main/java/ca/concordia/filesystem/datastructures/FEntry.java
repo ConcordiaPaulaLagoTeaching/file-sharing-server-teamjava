@@ -1,5 +1,7 @@
 // Fentry rpresents one file (name, size, pointer to first block)
 
+// very easy oop setters and getters, constructors, clear method
+
 package ca.concordia.filesystem.datastructures;
 
 public class FEntry {
@@ -73,7 +75,7 @@ public class FEntry {
     public void clear() {
         this.filename = "";
         this.filesize = 0;
-        this.firstBlock = -1;
+        this.firstBlock = -1; // set to -1 to indicate no blocks assigned
         this.inUse = false; 
     }
 }
