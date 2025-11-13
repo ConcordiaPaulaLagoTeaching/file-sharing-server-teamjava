@@ -148,7 +148,15 @@ public class FileSystemManager {
                     fileList.add(entry.getFilename());
                 }
             }
+            /* 
+            //  debugging
+            System.out.println("Free block list:");
+            for (int i = 0; i < freeBlockList.length; i++) {
+            System.out.println("Block " + i + ": " + freeBlockList[i]);
+            }
+            */
             return fileList.toArray(new String[0]);
+
         } finally {
             rwLock.readLock().unlock();
         }
@@ -158,6 +166,11 @@ public class FileSystemManager {
     public void writeFile(String fileName, byte[] contents) throws Exception {
         rwLock.writeLock().lock();
         try {
+
+            /* debugging
+             * Thread.sleep(5000);
+             */
+
             // find the file
             FEntry fileEntry = null;
             for (FEntry entry : inodeTable) {
@@ -215,6 +228,12 @@ public class FileSystemManager {
     public byte[] readFile(String fileName) throws Exception {
         rwLock.readLock().lock(); // aquire lock
         try {
+
+            /* 
+            * debugging
+            * Thread.sleep(5000);
+            */
+
             // find file in inode table
             FEntry fileEntry = null;
             for (FEntry entry : inodeTable) {
@@ -260,17 +279,10 @@ public class FileSystemManager {
     // SAVING STATE METHODS
     // helper to read fixed size string from disk file
     private String readFixedString(int length) throws IOException {
+        // must read exactly 11 bytes
         byte[] data = new byte[length];
-        disk.read(data);
-        return new String(data);
-    }
-
-    // helper to store text in the disk file in a fixed size format 
-    private void writeFixedString(String s, int length) throws IOException {
-        byte[] data = new byte[length];
-        byte[] nameBytes = s.getBytes();
-        System.arraycopy(nameBytes, 0, data, 0, Math.min(nameBytes.length, length));
-        disk.write(data);
+        disk.readFully(data);     
+        return new String(data).trim();
     }
 
     void saveMetadata() throws IOException {
@@ -280,7 +292,14 @@ public class FileSystemManager {
             disk.seek(0);
 
             for (FEntry entry : inodeTable) {
-                writeFixedString(entry.getFilename(), 11);
+                String name = entry.getFilename();
+                if (name == null) {
+                    name = "";
+                }
+                if (name.length() < 11){
+                    name = String.format("%-11s", name); // pad with spaces   
+                } 
+                disk.writeBytes(name); //write bytes, helper no longer needed
                 disk.writeShort(entry.getFilesize());
                 disk.writeShort(entry.getFirstBlock());
                 disk.writeBoolean(entry.isInUse());
